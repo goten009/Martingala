@@ -1,68 +1,87 @@
 import streamlit as st
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
+import gspread
+import json
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Autenticación con Google Sheets
+# Configuración de acceso a Google Sheets usando el secreto
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credenciales = ServiceAccountCredentials.from_json_keyfile_name("apuestas-rentables-457423-f22b0dd2752c.json", scope)
+credenciales = ServiceAccountCredentials.from_json_keyfile_dict(
+    json.loads(st.secrets["GOOGLE_CREDENTIALS"]), scope
+)
 cliente = gspread.authorize(credenciales)
 sheet = cliente.open("Control Apuestas Rentables").sheet1
 
-st.set_page_config(page_title="📈 Martingala Reducida", layout="centered")
-st.title("📊 Simulador de Martingala Reducida con Rentabilidad")
+st.set_page_config(page_title="Simulador de Apuesta con Martingala Reducida", layout="centered")
+st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 
-# Leer datos actuales
-data = sheet.get_all_records()
-df = pd.DataFrame(data)
+# Leer última fila
+datos = pd.DataFrame(sheet.get_all_records())
 
-if df.empty:
-    st.subheader("⚙️ Configura tu Bankroll Inicial")
-    bankroll_inicial = st.number_input("Bankroll inicial (COP):", min_value=1000, step=1000)
-    if st.button("Guardar configuración inicial"):
-        sheet.append_row(["GANADA", "CUOTA", "MONTO", "GANANCIA", "BANKROLL"])
-        sheet.append_row(["", "", "", "", bankroll_inicial])
-        st.success("✅ Configuración guardada, ya puedes comenzar tus apuestas.")
+if datos.empty:
+    st.warning("No hay datos aún.")
+    datos = pd.DataFrame(columns=["Bankroll", "Cuota", "Apuesta", "Ganancia", "Resultado"])
+
+# Configuración inicial
+st.subheader("🎰 Configuración inicial")
+bankroll_inicial = st.number_input("💰 Ingrese su bankroll inicial:", value=200000)
+cuota_promedio = st.number_input("🎯 Cuota promedio:", value=1.80, step=0.01)
+
+if st.button("Guardar configuración inicial"):
+    apuesta = bankroll_inicial / 100
+    nueva_fila = [bankroll_inicial, cuota_promedio, round(apuesta, 2), 0, "Inicio"]
+    sheet.append_row(nueva_fila)
+    st.success(f"✅ Primera apuesta sugerida: {apuesta:.2f}")
+
+# Evaluar siguiente apuesta
+st.markdown("---")
+st.subheader("🔁 ¿Cómo terminó la última apuesta?")
+
+cuota_real = st.number_input("📌 Ingresa la cuota real de esta apuesta:", value=1.80, step=0.01)
+ganada = st.checkbox("✅ Ganada")
+perdida = st.checkbox("❌ Perdida")
+
+if ganada and perdida:
+    st.error("Selecciona solo una opción: Ganada o Perdida.")
+elif cuota_real > 10:
+    st.warning("⚠️ Cuota muy alta. Por favor corrígela antes de continuar.")
 else:
-    st.subheader("🎯 Registrar nueva apuesta")
-    estado = st.selectbox("Resultado de la apuesta", ["Ganada", "Perdida"])
-    cuota = st.number_input("Cuota usada:", min_value=1.01, step=0.01)
-    
-    # Leer último bankroll
-    try:
-        last_row = sheet.get_all_values()[-1]
-        bankroll = float(last_row[-1])
-    except:
-        st.error("❌ No se pudo obtener el bankroll actual.")
-        st.stop()
+    if st.button("Guardar resultado"):
+        ultima = pd.DataFrame(sheet.get_all_records()).iloc[-1]
 
-    # Cálculo de monto
-    monto_base = bankroll / 100
-    historial = sheet.get_all_records()
-    apuestas = historial[1:]  # omitir encabezado
-
-    # Revisar si venimos de pérdida
-    secuencia = 1
-    for fila in reversed(apuestas):
-        if fila["GANADA"] == "Perdida":
-            secuencia *= 1.8
+        if ultima["Resultado"] == "Inicio":
+            bankroll = float(ultima["Bankroll"])
         else:
-            break
-    monto = round(monto_base * secuencia, 2)
-    st.markdown(f"💰 **Apuesta sugerida:** ${monto:,.0f}")
+            bankroll = float(ultima["Bankroll"])
 
-    if st.button("Registrar Apuesta"):
-        ganancia = round((monto * cuota) - monto, 2) if estado == "Ganada" else -monto
-        nuevo_bankroll = bankroll + ganancia
-        sheet.append_row([estado, cuota, monto, ganancia, nuevo_bankroll])
-        st.success("✅ Apuesta registrada correctamente.")
-        st.markdown(f"🏦 **Nuevo Bankroll:** ${nuevo_bankroll:,.0f}")
-        
-        # Mostrar mensaje final
-        ultimas = sheet.get_all_records()[2:]  # omitir encabezados
-        estados = [x["GANADA"] for x in ultimas]
-        if all(e == "Ganada" for e in estados) and len(estados) >= 3:
-            st.balloons()
-            st.success("🎉 ¡Felicidades! Todas las apuestas han sido ganadas.")
-        elif "Perdida" in estados:
-            st.error("❌ Una apuesta fue perdida. Reinicia la secuencia.")
+        apuesta = float(ultima["Apuesta"])
+
+        if ganada:
+            ganancia = apuesta * (cuota_real - 1)
+            nuevo_bankroll = bankroll + ganancia
+            nueva_apuesta = nuevo_bankroll / 100
+            resultado = "Ganada"
+            st.success(f"✅ Ganaste. Nueva apuesta sugerida: {nueva_apuesta:.2f}")
+        elif perdida:
+            ganancia = 0
+            nuevo_bankroll = bankroll - apuesta
+            nueva_apuesta = apuesta * cuota_real
+            resultado = "Perdida"
+            st.error(f"❌ Perdiste. Nueva apuesta sugerida: {nueva_apuesta:.2f}")
+        else:
+            ganancia = 0
+            nueva_apuesta = apuesta
+            resultado = ""
+
+        nueva_fila = [nuevo_bankroll, cuota_real, round(nueva_apuesta, 2), round(ganancia, 2), resultado]
+        sheet.append_row(nueva_fila)
+
+# Mostrar próxima apuesta sugerida
+st.markdown("---")
+st.subheader("📌 Próxima apuesta sugerida")
+
+try:
+    ultima_valida = pd.DataFrame(sheet.get_all_records()).iloc[-1]
+    st.success(f"💵 {ultima_valida['Apuesta']:.2f}")
+except:
+    st.info("No hay apuestas previas.")
