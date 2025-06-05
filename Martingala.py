@@ -4,7 +4,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
 st.set_page_config(page_title="Simulador Martingala", layout="centered")
-
 st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 
 # ---------------------- AUTENTICACIÓN GOOGLE ---------------------- #
@@ -25,11 +24,7 @@ def calcular_apuesta_siguiente(df):
     cuota = float(ultima["Cuota"])
     ultima_apuesta = float(ultima["Apuesta"])
     bankroll = float(ultima["Bankroll"])
-    if resultado == "Ganada":
-        nueva_apuesta = bankroll / 100
-    else:
-        nueva_apuesta = ultima_apuesta * cuota
-    return round(nueva_apuesta, 2)
+    return round(bankroll / 100 if resultado == "Ganada" else ultima_apuesta * cuota, 2)
 
 # ---------------------- FORMULARIO INICIAL ---------------------- #
 st.subheader("🎰 Configuración inicial")
@@ -77,39 +72,39 @@ if resultado:
         sheet.append_row(nueva_fila)
         st.success(f"🎯 {resultado}. Nueva apuesta sugerida: {nueva_apuesta}")
 
-# ---------------------- MOSTRAR PRÓXIMA APUESTA, BANKROLL, WINRATE, RENTABILIDAD ---------------------- #
+# ---------------------- MOSTRAR PRÓXIMA APUESTA Y ESTADÍSTICAS ---------------------- #
 st.markdown("---")
-st.subheader("📌 Estado actual")
+st.subheader("📌 Próxima apuesta sugerida")
 
 try:
     df = pd.DataFrame(sheet.get_all_records())
     apuesta_actual = calcular_apuesta_siguiente(df)
     bankroll_actual = float(df.iloc[-1]["Bankroll"])
-    bankroll_inicial = float(df.iloc[1]["Bankroll"]) if len(df) > 1 else bankroll_actual
+    df_jugadas = df[df["Resultado"].isin(["Ganada", "Perdida"])]
 
-    ganadas = df[df["Resultado"] == "Ganada"].shape[0]
-    perdidas = df[df["Resultado"] == "Perdida"].shape[0]
-    total_apuestas = ganadas + perdidas
-    winrate = (ganadas / total_apuestas * 100) if total_apuestas > 0 else 0
-    rentabilidad = ((bankroll_actual - bankroll_inicial) / bankroll_inicial) * 100
+    total_apuestas = len(df_jugadas)
+    ganadas = (df_jugadas["Resultado"] == "Ganada").sum()
+    winrate = round((ganadas / total_apuestas) * 100, 2) if total_apuestas > 0 else 0
+
+    bankroll_inicial = float(df.iloc[0]["Bankroll"])
+    rentabilidad = round(((bankroll_actual - bankroll_inicial) / bankroll_inicial) * 100, 2)
 
     st.markdown(
         f"""
         <div style='background-color:#013220;padding:10px;border-radius:10px;margin-bottom:10px;'>
-            <span style='color:#39FF14;font-size:24px;'>💵 Próxima apuesta: {apuesta_actual}</span>
+            <span style='color:#39FF14;font-size:24px;'>💵 Próxima Apuesta: <strong>{apuesta_actual}</strong></span>
         </div>
         <div style='background-color:#262730;padding:10px;border-radius:10px;margin-bottom:10px;'>
             <span style='color:#ffffff;font-size:18px;'>💼 Bankroll actual: <strong>{bankroll_actual:,.2f}</strong></span>
         </div>
-        <div style='background-color:#1c1c1c;padding:10px;border-radius:10px;margin-bottom:10px;'>
-            <span style='color:#00BFFF;font-size:18px;'>📊 Winrate: <strong>{winrate:.2f}%</strong></span>
-        </div>
-        <div style='background-color:#1c1c1c;padding:10px;border-radius:10px;'>
-            <span style='color:#FFD700;font-size:18px;'>📈 Rentabilidad: <strong>{rentabilidad:.2f}%</strong></span>
+        <div style='background-color:#003366;padding:10px;border-radius:10px;margin-bottom:10px;'>
+            <span style='color:#00BFFF;font-size:18px;'>📊 Winrate: <strong>{winrate}%</strong></span><br>
+            <span style='color:#FFD700;font-size:18px;'>📈 Rentabilidad: <strong>{rentabilidad}%</strong></span>
         </div>
         """,
         unsafe_allow_html=True
     )
 
 except Exception as e:
-    st.warning(f"⚠️ Error al calcular resultados: {e}")
+    st.warning("⚠️ No se puede calcular la siguiente apuesta aún.")
+    st.text(f"Error: {e}")
