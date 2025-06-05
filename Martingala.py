@@ -11,7 +11,7 @@ st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 # ---------------------- AUTENTICACIÓN GOOGLE ---------------------- #
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credenciales = ServiceAccountCredentials.from_json_keyfile_dict(
-    json.loads(st.secrets["GOOGLE_CREDENTIALS"]), scope
+    st.secrets["GOOGLE_CREDENTIALS"], scope
 )
 cliente = gspread.authorize(credenciales)
 spreadsheet = cliente.open("Control Apuestas Rentables")
