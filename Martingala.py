@@ -88,7 +88,7 @@ if resultado:
         sheet.append_row(nueva_fila)
         st.success(f"🎯 {resultado}. Nueva apuesta sugerida: {nueva_apuesta}")
 
-# ---------------------- MOSTRAR PRÓXIMA APUESTA Y BANKROLL ---------------------- #
+# ---------------------- MOSTRAR PRÓXIMA APUESTA Y ESTADÍSTICAS ---------------------- #
 st.markdown("---")
 st.subheader("📌 Próxima apuesta sugerida")
 
@@ -96,18 +96,30 @@ try:
     df = pd.DataFrame(sheet.get_all_records())
     apuesta_actual = calcular_apuesta_siguiente(df)
     bankroll_actual = float(df.iloc[-1]["Bankroll"])
+    bankroll_inicial = float(df.iloc[0]["Bankroll"])
+
+    # Cálculo winrate y rentabilidad
+    resultados_validos = df[df["Resultado"].isin(["Ganada", "Perdida"])]
+    total = len(resultados_validos)
+    ganadas = len(resultados_validos[resultados_validos["Resultado"] == "Ganada"])
+    winrate = (ganadas / total * 100) if total > 0 else 0
+    rentabilidad = ((bankroll_actual - bankroll_inicial) / bankroll_inicial * 100)
 
     st.markdown(
         f"""
         <div style='background-color:#013220;padding:10px;border-radius:10px;margin-bottom:10px;'>
             <span style='color:#39FF14;font-size:24px;'>💵 {apuesta_actual}</span>
         </div>
-        <div style='background-color:#262730;padding:10px;border-radius:10px;'>
+        <div style='background-color:#262730;padding:10px;border-radius:10px;margin-bottom:10px;'>
             <span style='color:#ffffff;font-size:18px;'>💼 Bankroll actual: <strong>{bankroll_actual:,.2f}</strong></span>
+        </div>
+        <div style='background-color:#1f2b37;padding:10px;border-radius:10px;'>
+            <span style='color:#4dd0e1;font-size:18px;'>📊 Winrate: <strong>{winrate:.2f}%</strong></span><br>
+            <span style='color:#f9a825;font-size:18px;'>📈 Rentabilidad: <strong>{rentabilidad:.2f}%</strong></span>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-except:
+except Exception as e:
     st.warning("⚠️ No se puede calcular la siguiente apuesta aún.")
