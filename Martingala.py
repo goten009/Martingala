@@ -9,9 +9,10 @@ st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 # ---------------------- AUTENTICACIÓN GOOGLE ---------------------- #
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# Convertir de SectionProxy a dict clásico
-credenciales_dict = {k: v for k, v in st.secrets["GOOGLE_CREDENTIALS"].items()}
-credenciales = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
+# ✅ Usa directamente el secret como dict
+credenciales = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["GOOGLE_CREDENTIALS"], scope
+)
 
 cliente = gspread.authorize(credenciales)
 spreadsheet = cliente.open("Control Apuestas Rentables")
