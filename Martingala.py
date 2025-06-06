@@ -9,6 +9,8 @@ st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 
 # ---------------------- AUTENTICACIÓN GOOGLE ---------------------- #
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# ✅ Usamos json.loads porque el secreto es una cadena JSON válida
 credenciales_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
 credenciales = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
 
