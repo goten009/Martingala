@@ -2,17 +2,15 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
+import json
 
 st.set_page_config(page_title="Simulador Martingala", layout="centered")
 st.title("📈 Simulador de Apuesta con\nMartingala Reducida")
 
 # ---------------------- AUTENTICACIÓN GOOGLE ---------------------- #
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
-# ✅ Usa directamente el secret como dict
-credenciales = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["GOOGLE_CREDENTIALS"], scope
-)
+credenciales_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+credenciales = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
 
 cliente = gspread.authorize(credenciales)
 spreadsheet = cliente.open("Control Apuestas Rentables")
@@ -117,6 +115,5 @@ try:
         """,
         unsafe_allow_html=True
     )
-
 except Exception as e:
     st.warning(f"⚠️ No se puede calcular la siguiente apuesta aún. Error: {e}")
